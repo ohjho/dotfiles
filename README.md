@@ -13,3 +13,8 @@ uv run https://ohjho.github.io/dotfiles/scripts/probe_media.py --help
 ```
 
 > The longer `https://raw.githubusercontent.com/ohjho/dotfiles/main/scripts/<name>.py` form keeps working too.
+
+for scripts that requires environment variables ( see [.env.example](.env.example)) you could run it like:
+```sh
+uv run --env-file .env https://ohjho.github.io/dotfiles/scripts/upload_imgbb.py path/to/image.jpg
+```
