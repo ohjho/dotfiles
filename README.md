@@ -18,3 +18,14 @@ for scripts that requires environment variables ( see [.env.example](.env.exampl
 ```sh
 uv run --env-file .env https://ohjho.github.io/dotfiles/scripts/upload_imgbb.py path/to/image.jpg
 ```
+
+## Claude Code
+
+by setting some simple environment variables you can run Claude Code using the provided [.env.example.ccr](.env.example.ccr) (first `cp .env.example.ccr .env` and set your models and API key):
+```sh
+# if you have pipx installed dotfile-cli
+dotfile claude
+
+# or just using uv
+uv run --no-project --env-file .env -- claude
+```
