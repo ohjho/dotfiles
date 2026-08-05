@@ -21,7 +21,7 @@ uv run --env-file .env https://ohjho.github.io/dotfiles/scripts/upload_imgbb.py 
 
 ## Claude Code
 
-by setting some simple environment variables you can run Claude Code using the provided [.env.example.ccr](.env.example.ccr) (first `cp .env.example.ccr .env` and set your models and API key):
+by setting some simple environment variables you can run Claude Code on [OpenRouter](https://openrouter.ai/apps/claude-code) using the provided [.env.example.ccr](.env.example.ccr) (first `cp .env.example.ccr .env` and set your models and API key):
 ```sh
 # if you have pipx installed dotfile-cli
 dotfile claude
