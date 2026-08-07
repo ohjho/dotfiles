@@ -21,11 +21,13 @@ uv run --env-file .env https://ohjho.github.io/dotfiles/scripts/upload_imgbb.py 
 
 ## Claude Code
 
-by setting some simple environment variables you can run Claude Code on [OpenRouter](https://openrouter.ai/apps/claude-code) using the provided [.env.example.ccr](.env.example.ccr) (first `cp .env.example.ccr .env` and set your models and API key):
+by setting some simple environment variables you can run Claude Code on [OpenRouter](https://openrouter.ai/apps/claude-code) or Ollama using [.env.example](.env.example) (first `cp .env.example .env` and set your models and API key):
 ```sh
-# if you have pipx installed dotfile-cli
-dotfile claude
+# if you have pipx installed dotenv-cli
+dotenv claude
 
 # or just using uv
 uv run --no-project --env-file .env -- claude
 ```
+
+* for running the Ollam, please comment out the Openrouter in `.env.example` and uncomment the Ollama section. Those environment variables basically replace what [`ollama launch claude`](https://docs.ollama.com/integrations/claude-code) does. First make sure that you've ran `ollama serve` and if using cloud model please also run `ollama login`.
