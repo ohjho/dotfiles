@@ -1,6 +1,10 @@
 # dotfiles
 configs, scripts, tools
 
+- [Scripts](#scripts) — self-contained Python scripts, runnable with `uv run` locally or from their GitHub Pages URL
+- [Screen sessions](#screen-sessions) — recreate GNU `screen` sessions after a reboot from `configs/screens.yaml`
+- [Claude Code](#claude-code) — run Claude Code against OpenRouter or Ollama via `.env`
+
 ## Scripts
 
 The scripts in [`scripts/`](scripts/) are self-contained ([PEP 723](https://peps.python.org/pep-0723/) inline deps) and can be run directly from this repo with [`uv`](https://docs.astral.sh/uv/).
@@ -18,6 +22,20 @@ for scripts that requires environment variables ( see [.env.example](.env.exampl
 ```sh
 uv run --env-file .env https://ohjho.github.io/dotfiles/scripts/upload_imgbb.py path/to/image.jpg
 ```
+
+## Screen sessions
+
+[`configs/screens.yaml`](configs/screens.yaml) describes the GNU `screen` sessions (and the servers inside them) to bring back after a reboot; [`scripts/screen_sessions.py`](scripts/screen_sessions.py) does the work:
+
+```sh
+uv run scripts/screen_sessions.py status     # what is running vs. the manifest
+uv run scripts/screen_sessions.py launch     # recreate whatever is missing (existing sessions are skipped)
+uv run scripts/screen_sessions.py snapshot   # dump the live layout as YAML to curate into the manifest
+```
+
+Outside the repo both the script and the manifest are fetched from GitHub Pages: `uv run https://ohjho.github.io/dotfiles/scripts/screen_sessions.py status`.
+
+> **Why a custom script?** macOS ships GNU screen 4.00.03 (2006), which cannot list a session's windows or their working directories, so the script discovers them by walking the process tree with `psutil`. If you are willing to switch to [tmux](https://github.com/tmux/tmux), none of this is needed: [tmuxp](https://github.com/tmux-python/tmuxp) already loads sessions from YAML (`tmuxp load` ≈ `launch`, `tmuxp freeze` ≈ `snapshot`), and [libtmux](https://github.com/tmux-python/libtmux) exposes each window's cwd and running command natively, so the `status` view would be a few dozen lines instead of this CLI and skill.
 
 ## Claude Code
 

@@ -1,0 +1,40 @@
+# Declarative GNU screen layout, consumed by scripts/screen_sessions.py.
+#
+#   uv run scripts/screen_sessions.py status     # compare this file with what's running
+#   uv run scripts/screen_sessions.py launch     # recreate whatever is missing
+#   uv run scripts/screen_sessions.py snapshot   # dump the live layout in this format
+#
+# - Windows are numbered by list order (0, 1, 2, ...); they carry no titles.
+# - `cwd` may use ~ and defaults to the home directory when omitted.
+# - `command` is optional: omit it for a plain interactive shell.
+# - Commands are typed into an interactive zsh window, so anything on your
+#   normal PATH (uv, ollama, claude, ...) works and the window drops back to a
+#   prompt when the command exits.
+version: 1
+defaults:
+  settle: 1.0   # seconds to wait after creating a window before typing its command
+sessions:
+  - name: scripts   # scratch shells parked in project dirs
+    windows:
+      - {cwd: ~/Documents/Git/_forks/bender}
+      - {cwd: ~/Documents/Git/_miro}
+      - {cwd: ~/Documents/Git/_miro/dsx-vlm-search}
+      - {cwd: ~/Documents/Git/_GADA_experiments/quarto-johnho-dot-ca}
+  - name: claude    # shells only; start `claude` by hand in each
+    windows:
+      - {cwd: ~/Documents/Git/_miro/dsx-extract-arena}
+      - {cwd: ~/Documents/Git/_miro/dsx-sam-tracking}
+  - name: jupyter
+    windows:
+      - {cwd: ~/Documents/Git/_miro/clip-cognition,   command: uv run jupyter lab --port 8887}
+      - {cwd: ~/Documents/Git/_miro/dsx-sam-tracking, command: uv run jupyter lab}
+  - name: ollama
+    windows:
+      - {cwd: "~", command: ollama serve}
+  - name: streamlit
+    windows:
+      - {cwd: ~/Documents/Git/_seekingvega/st-positionIQ, command: uv run streamlit run streamlit_app.py --server.port 8502}
+      - {cwd: ~/Documents/Git/_seekingvega/questlit,      command: uv run streamlit run streamlit_app.py --server.port 8501}
+      - {cwd: ~/Documents/Git/_miro/clip-cognition,       command: uv run streamlit run streamlit_demo/deepeval_results_viewer.py}
+      - {cwd: ~/Documents/Git/_miro/dsx-sam-tracking,     command: uv run streamlit run streamlit_apps/st_annotated_videos_compare.py}
+      - {cwd: ~/Documents/Git/_miro/dsx-sam-tracking,     command: uv run streamlit run streamlit_apps/st_debug_compare.py}
