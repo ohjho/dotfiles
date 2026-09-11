@@ -1,0 +1,193 @@
+---
+title: "<What Was Tested>: <On What, With What>"
+abstract: <one line for the listing page — what a reader learns from this post>
+date: <M/D/YYYY, today>
+date-format: full
+author: <author line from the host project or my-defaults.md>
+categories:
+    - <site vocabulary>
+    - <2-4 entries>
+format:
+    html:
+        mermaid:
+            theme: forest
+            securityLevel: loose
+        toc: true
+        toc-depth: 3
+        toc-expand: 2
+        toc-title: Contents
+        toc-location: left
+        link-external-icon: true
+        link-external-newwindow: true
+draft: false
+execute:
+  echo: false
+code-annotations: hover
+lightbox: true
+crossref:
+    custom:
+    - kind: float
+      reference-prefix: Card    # "Video" / key "vid" when the evidence is video
+      key: card
+---
+
+<!-- Template: experiment run write-up. Replace every <placeholder>; delete comments and any
+     section you do not need. Every number below must come from a script you ran on the
+     result files in this session. -->
+
+# Introduction
+
+<!-- 2 paragraphs: what the system/experiment is (one sentence a newcomer can follow), and the
+     practical question this post answers. Link the companion explainer/page if one exists. -->
+
+**<System name>** is <one-sentence description>. <Where the models/tools live, with a link.>
+
+The question for this post is practical: <the decision this experiment informs>.
+
+::: {.column-page}
+```{mermaid}
+flowchart LR
+    IN["<input data><br/><N rows>"] --> S1["<step 1 command><br/><what it guarantees>"]
+    S1 --> S2["<step 2 command>"]
+    S2 --> S3["<step 3 command>"]
+    S3 --> OUT["<companion page / parsed table>"]
+    S1 -. "<one call per row>" .-> EXT["<hosted models / external service>"]
+```
+:::
+
+# The Dataset
+
+The input is `<input file>`: <N> <units> from <source>, where <selection criterion>. The columns
+that matter here:
+
+- `<image/url column>` — <what the models were shown>.
+- `<internal value column>` — <what the existing pipeline produced>.
+- `<grouping column>` — <e.g. detector source, orientation>.
+
+::: {.callout-important}
+## <Framing statement the reader must not miss>
+
+<!-- e.g. "The internal OCR is not ground truth": say whether the comparison is an accuracy
+     measurement or an audit, and who the arbiter is. This is the user's answer to the
+     framing question. -->
+:::
+
+# Running the Batch
+
+<Number> `<cli>` commands take the data from raw rows to a comparable table. The models were
+`<m1>`, `<m2>` and `<m3>`, and the fields `"<field 1>"` and `"<field 2>"`:
+
+```bash
+uv run main.py <step-1> <input.csv> --out-csv <results.csv> -f "<field>" -m <m1> -m <m2> # <1>
+uv run main.py <step-2> <results.csv> -f "<field>"                                    # <2>
+uv run main.py <step-3> <results.csv> --out-csv <parsed.csv>                          # <3>
+```
+1. <what step 1 guarantees, e.g. resumable, checkpoint every row>
+2. <what step 2 does, e.g. re-calls only the models that errored>
+3. <what step 3 produces, e.g. wide model/field columns and an agree/field flag>
+
+**`<step-1>` is <property>.** <One paragraph on why that matters operationally.>
+
+**`<step-2>` is <property>.** <One paragraph; include the post-retry state, e.g. "all N×M entries
+held a reply with `error: null`".>
+
+For reference, this is what one stored result looks like (row 0):
+
+```json
+<one raw result, lightly reformatted, unabridged in structure>
+```
+
+# Results
+
+## Reviewing the Results
+
+<!-- Only when a companion interactive page exists. Link it, describe cards/filters/controls,
+     and what each filter reveals. Do NOT reproduce its grid or headline counts as tables. -->
+
+Statistics only get you so far when the arbiter is the image. The results were turned into a
+review page — [<page host>](<https://…>) — built from the parsed table by `<build script>`:
+
+```bash
+<rebuild command with bare filenames>
+```
+
+Each card shows <what a card shows>. <What the header counts are, in words.> Two filters slice
+the grid: **<filter 1>** (<values>) and **<filter 2>** (<values>). "<Value>" is the review queue.
+
+What the page cannot show at a glance is how differently the <models/systems> get to their
+answers:
+
+::: {.column-page}
+| model | answered (of <N>) | = <internal value> | <other field> | latency mean / median / max (s) |
+|:---|---:|---:|---:|:---|
+| `<m1>` | | | | |
+| `<m2>` | | | | |
+| `<m3>` | | | | |
+
+: per-model behaviour and reported latency {#tbl-models}
+:::
+
+<One paragraph reading the table: who is fast, who abstains, who is noisy — facts, not
+verdicts.>
+
+::: {.callout-tip}
+## <Pattern worth filtering for, e.g. "Agreement tracks the crop, not just the model">
+
+<Rates by a grouping column, with counts; what it implies for where to look.>
+:::
+
+## <Interesting subset, e.g. Split Decisions>
+
+<Why this subset matters; what the crops suggest.> @card-<a> shows <…>; @card-<b> shows <…>.
+
+::: {#card-<a> .column-page}
+::: {layout-ncol=2}
+![<internal **X** · m1 A · m2 B · m3 C>](<https://…/example-1.jpg>)
+
+![<internal **Y** · m1 A · m2 B · m3 C>](<https://…/example-2.jpg>)
+:::
+
+<Caption: ids of the examples and observable facts — "two players share the crop" — no verdicts
+unless the user allowed them.>
+:::
+
+## <Second field or secondary result, e.g. Player Names>
+
+<Prose with counts; a small captioned table if values are worth comparing.>
+
+::: {.column-page}
+| example | <internal> | `<m1>` | `<m2>` | `<m3>` |
+|:---|---:|:---|:---|:---|
+| `<id>` | | | | |
+
+: <caption> {#tbl-<slug>}
+:::
+
+## Quirks Found Along the Way
+
+::: {.callout-note}
+## <N> things the tooling had to absorb
+
+1. **<Quirk>.** <What happened, how often, how the tooling handled it, why the handling is right.>
+2. **<Quirk>.** <…>
+:::
+
+# Conclusion
+
+Across <N> <units>, <the system>:
+
+- **<finding with its count>** — <one clause of meaning>.
+- **<finding>** — <…>.
+- **<finding>** — <…>.
+
+Next steps, in order:
+
+1. **<Step>.** <What it unlocks.>
+2. **<Step>.** <…>
+3. **<Step>.** <…>
+
+::: {.callout-important}
+## Bottom line
+
+<The one decision this post supports, in two sentences.>
+:::

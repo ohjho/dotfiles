@@ -1,0 +1,96 @@
+---
+title: "<Topic> in <Year>"
+abstract: <the thesis in one line>
+date: <M/D/YYYY, today>
+date-format: full
+author: <author line from the host project or my-defaults.md>
+categories:
+    - Overview
+    - <topic>
+format:
+    html:
+        mermaid:
+            theme: forest
+            securityLevel: loose
+        toc: true
+        toc-depth: 3
+        toc-expand: 2
+        toc-title: Contents
+        toc-location: left
+        link-external-icon: true
+        link-external-newwindow: true
+draft: false
+execute:
+  echo: false
+lightbox: true
+---
+
+<!-- Template: roadmap / opinion / proposal. Argument in numbered sections; every claim about
+     the outside world carries a footnote with a link; images are remote and captioned.
+     Reference-style link definitions sit at the end of each section so the prose stays clean. -->
+
+# Background
+
+<Where this comes from: the project, the incident, or the trend that prompted the post.
+Two or three paragraphs. One image is plenty.>
+
+![<caption: what the image is and why it is here>](<https://…/image.jpg>){height=500 .preview-image}
+
+<Set up the thesis in one sentence at the end of the section.>[^note-background]
+
+[^note-background]: <source or aside, with a [link](<https://…>)>
+
+[url-thing]: <https://…>
+
+# I. <First claim>
+
+<Evidence for the claim: what changed, who did it, when — each fact footnoted.>[^note-1a]
+<Consequence for us, in one paragraph.>
+
+![<caption>](<https://…/image.jpg>){height=500}
+
+[^note-1a]: <source, with a [link](<https://…>)>
+
+[url-1a]: <https://…>
+
+# II. <Second claim>
+
+<Same shape. Use a small table only when comparing options side by side:>
+
+| option | strengths | costs |
+|:---|:---|:---|
+| <A> | | |
+| <B> | | |
+
+: <caption> {#tbl-options}
+
+[^note-2a]: <source>
+
+# III. <Third claim>
+
+<Same shape.>
+
+# Caution
+
+::: {.callout-warning}
+## <The risk or the counter-argument>
+
+<What could make this thesis wrong, and what we would watch for.>
+:::
+
+# Recap
+
+- **<Claim I>** — <one clause>.
+- **<Claim II>** — <one clause>.
+- **<Claim III>** — <one clause>.
+
+::: {.callout-important}
+## Bottom line
+
+<The recommendation, in two sentences.>
+:::
+
+# Resources {.unnumbered}
+
+- [<Reference>](<https://…>)
+- [<Related post>](<other-post.qmd>)

@@ -1,0 +1,123 @@
+---
+title: "<Tool or Task> Guide"
+abstract: <how to do X with Y, for whom>
+date: <M/D/YYYY, today>
+date-format: full
+author: <author line from the host project or my-defaults.md>
+categories:
+    - how-to
+    - <topic>
+format:
+    html:
+        mermaid:
+            theme: forest
+            securityLevel: loose
+        toc: true
+        toc-depth: 3
+        toc-expand: 2
+        toc-title: Contents
+        toc-location: left
+        link-external-icon: true
+        link-external-newwindow: true
+draft: false
+execute:
+  echo: false
+code-annotations: hover
+crossref:
+    custom:
+    - kind: float
+      reference-prefix: Video
+      key: vid
+---
+
+<!-- Template: how-to / guide. Numbered stages; each stage = one command block the reader can
+     copy, one collapsible parameter reference, one worked example. Delete what you don't use. -->
+
+# Intro {.unnumbered}
+
+This is a step-by-step guide to <outcome> using <tool>, building on <prior post or repo link>.
+It assumes <prerequisites: access, environment, data shape>.
+
+::: {.column-body-outset}
+```{mermaid .preview-image}
+%%| label: fig-overview
+%%| fig-cap: "High-level flow from <input> to <output>"
+flowchart LR
+    A((<input>)) --> B(<stage I>) --> C(<stage II>) --> D((<output>))
+```
+:::
+
+# I: <First stage>
+
+Using `<script or CLI>` from [<repo>](<https://…>), we <what this stage produces>:
+
+```bash
+uv run <cli> <subcommand> <input> <output> \
+    --<flag> <value> \   # <1>
+    --<flag> <value>     # <2>
+```
+1. <what this flag controls and why this value>
+2. <what this flag controls and why this value>
+
+::: {.callout-caution collapse="true"}
+## Expand for details on `<subcommand>`'s parameters
+
+- Required:
+  - `<arg>`: <meaning>[^input-shape]
+  - `<arg>`: <meaning>
+- <Group, e.g. Model parameters>:
+  - `<flag>`: <meaning> (default: `<value>`)
+- <Group, e.g. Performance>:
+  - `<flag>`: <meaning> (recommended: <value>[^why-recommended])
+- Debug:
+  - `<flag>`: <meaning>
+:::
+
+[^input-shape]: <columns the input must have, one line each>
+[^why-recommended]: <the reason behind the recommendation; the footnote keeps the list short>
+
+# II: <Second stage>
+
+<What this stage consumes from stage I and what it emits.>
+
+```{.bash filename="<scripts/example.sh>"}
+<command as a file, when the reader should save it rather than type it>
+```
+
+::: {.callout-caution collapse="true"}
+## Expand for details on `<function>`'s parameters
+- `<param>`: <meaning> (default: `<value>`)
+:::
+
+## Example output
+
+<Describe what the reader should see; then show it.>
+
+::: {#vid-<slug> .column-page}
+::: {layout-ncol=2}
+{{< video https://…/example.mp4 >}}
+
+![<what the still shows>](<https://…/example.jpg>)
+:::
+
+<Caption: which input produced this, and what to look for.>
+:::
+
+# III: <Third stage>
+
+<Repeat the pattern. Stop adding stages when the reader has the output promised in the Intro.>
+
+::: {.callout-tip}
+## <Common pitfall and how to avoid it>
+
+<One paragraph.>
+:::
+
+# Conclusion {.unnumbered}
+
+<What the reader can now do; what is still manual; where the code lives.>
+
+# Resources {.unnumbered}
+
+- [<Repo or docs>](<https://…>)
+- [<Related post>](<other-post.qmd>)
