@@ -1,0 +1,282 @@
+{
+  "$description": "Keystone: colour = signal temperature. Hot tokens mark what the model attends to, cold tokens what it ignores; every other colour stays quiet so the ramp reads as meaning, not decoration.",
+  "color": {
+    "light": {
+      "bg": {
+        "$type": "color",
+        "$value": "#F3F5F4",
+        "$extensions": {
+          "design-derivation": {
+            "from": "constraint"
+          }
+        },
+        "$description": "cool off-white so the hot ramp stays legible"
+      },
+      "surface": {
+        "$type": "color",
+        "$value": "#FFFFFF",
+        "$extensions": {
+          "design-derivation": {
+            "from": "constraint"
+          }
+        }
+      },
+      "ink": {
+        "$type": "color",
+        "$value": "#17232B",
+        "$extensions": {
+          "design-derivation": {
+            "from": "audience"
+          }
+        }
+      },
+      "muted": {
+        "$type": "color",
+        "$value": "#5B6B74",
+        "$extensions": {
+          "design-derivation": {
+            "from": "audience"
+          }
+        }
+      },
+      "line": {
+        "$type": "color",
+        "$value": "#D8DFE2",
+        "$extensions": {
+          "design-derivation": {
+            "from": "constraint"
+          }
+        }
+      },
+      "accent": {
+        "$type": "color",
+        "$value": "#B0480B",
+        "$extensions": {
+          "design-derivation": {
+            "from": "content"
+          }
+        },
+        "$description": "the hottest step of the ramp doubles as the accent"
+      },
+      "accent-soft": {
+        "$type": "color",
+        "$value": "#F7E4D6",
+        "$extensions": {
+          "design-derivation": {
+            "from": "content"
+          }
+        }
+      },
+      "hot": {
+        "$type": "color",
+        "$value": "#B0480B",
+        "$extensions": {
+          "design-derivation": {
+            "from": "content"
+          }
+        },
+        "$description": "high attention"
+      },
+      "warm": {
+        "$type": "color",
+        "$value": "#A6367A",
+        "$extensions": {
+          "design-derivation": {
+            "from": "content"
+          }
+        },
+        "$description": "mid attention"
+      },
+      "cold": {
+        "$type": "color",
+        "$value": "#4B6A8A",
+        "$extensions": {
+          "design-derivation": {
+            "from": "content"
+          }
+        },
+        "$description": "ignored patches"
+      }
+    },
+    "dark": {
+      "bg": {
+        "$type": "color",
+        "$value": "#0E1A1D",
+        "$extensions": {
+          "design-derivation": {
+            "from": "constraint"
+          }
+        },
+        "$description": "teal-black ground so the ramp glows"
+      },
+      "surface": {
+        "$type": "color",
+        "$value": "#152428",
+        "$extensions": {
+          "design-derivation": {
+            "from": "constraint"
+          }
+        }
+      },
+      "ink": {
+        "$type": "color",
+        "$value": "#E6EDEF",
+        "$extensions": {
+          "design-derivation": {
+            "from": "audience"
+          }
+        }
+      },
+      "muted": {
+        "$type": "color",
+        "$value": "#93A5AC",
+        "$extensions": {
+          "design-derivation": {
+            "from": "audience"
+          }
+        }
+      },
+      "line": {
+        "$type": "color",
+        "$value": "#27383D",
+        "$extensions": {
+          "design-derivation": {
+            "from": "constraint"
+          }
+        }
+      },
+      "accent": {
+        "$type": "color",
+        "$value": "#F2A13B",
+        "$extensions": {
+          "design-derivation": {
+            "from": "content"
+          }
+        }
+      },
+      "accent-soft": {
+        "$type": "color",
+        "$value": "#3A2A12",
+        "$extensions": {
+          "design-derivation": {
+            "from": "content"
+          }
+        }
+      },
+      "hot": {
+        "$type": "color",
+        "$value": "#F2A13B",
+        "$extensions": {
+          "design-derivation": {
+            "from": "content"
+          }
+        },
+        "$description": "high attention"
+      },
+      "warm": {
+        "$type": "color",
+        "$value": "#E06AB8",
+        "$extensions": {
+          "design-derivation": {
+            "from": "content"
+          }
+        },
+        "$description": "mid attention"
+      },
+      "cold": {
+        "$type": "color",
+        "$value": "#7FA0C0",
+        "$extensions": {
+          "design-derivation": {
+            "from": "content"
+          }
+        },
+        "$description": "ignored patches"
+      }
+    }
+  },
+  "font": {
+    "$type": "fontFamily",
+    "display": {
+      "$value": [
+        "IBM Plex Mono",
+        "ui-monospace",
+        "monospace"
+      ],
+      "$description": "mono for structure: headings, labels, readouts",
+      "$extensions": {
+        "design-derivation": {
+          "from": "audience"
+        }
+      }
+    },
+    "body": {
+      "$value": [
+        "IBM Plex Sans",
+        "system-ui",
+        "sans-serif"
+      ],
+      "$description": "sans for prose; mono tires in paragraphs",
+      "$extensions": {
+        "design-derivation": {
+          "from": "audience"
+        }
+      }
+    },
+    "mono": {
+      "$value": [
+        "IBM Plex Mono",
+        "ui-monospace",
+        "monospace"
+      ],
+      "$extensions": {
+        "design-derivation": {
+          "from": "audience"
+        }
+      }
+    }
+  },
+  "radius": {
+    "md": {
+      "$type": "dimension",
+      "$value": {
+        "value": 4,
+        "unit": "px"
+      },
+      "$description": "tight corners, instrument-like",
+      "$extensions": {
+        "design-derivation": {
+          "from": "audience"
+        }
+      }
+    }
+  },
+  "space": {
+    "base": {
+      "$type": "dimension",
+      "$value": {
+        "value": 8,
+        "unit": "px"
+      },
+      "$extensions": {
+        "design-derivation": {
+          "from": "goal"
+        }
+      }
+    }
+  },
+  "measure": {
+    "body": {
+      "$type": "dimension",
+      "$value": {
+        "value": 68,
+        "unit": "ch"
+      },
+      "$extensions": {
+        "design-derivation": {
+          "from": "goal"
+        }
+      }
+    }
+  }
+}

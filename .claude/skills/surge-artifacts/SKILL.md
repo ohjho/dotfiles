@@ -102,6 +102,8 @@ When unsure: a well-composed page is never the wrong answer; an over-designed vi
 
 ### Process
 
+**Derive before you sketch.** Check `surge_artifacts/<slug>/` for a `design.md` / `design.tokens.json` pair left by the `design-derivation` skill. If they exist, they *are* the design plan below — render the CSS with `uv run https://ohjho.github.io/dotfiles/scripts/design_tokens.py render css surge_artifacts/<slug>/design.tokens.json` (or `uv run scripts/design_tokens.py …` inside the dotfiles repo) and paste the result at the top of `<style>` as the token block described under Theming. If they don't exist and the page deserves more than a utilitarian pass, run `design-derivation` first; it writes those files next to the page and hands back here.
+
 Before writing code, sketch a short design plan — a compact token system:
 
 - **Color**: the palette as 4–6 named hex values.
