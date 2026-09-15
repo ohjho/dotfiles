@@ -18,12 +18,14 @@ sessions:
     windows:
       - {cwd: ~/Documents/Git/_forks/bender}
       - {cwd: ~/Documents/Git/_miro}
-      - {cwd: ~/Documents/Git/_miro/dsx-vlm-search}
-      - {cwd: ~/Documents/Git/_GADA_experiments/quarto-johnho-dot-ca}
   - name: claude    # shells only; start `claude` by hand in each
     windows:
-      - {cwd: ~/Documents/Git/_miro/dsx-extract-arena}
+      - {cwd: ~/Documents/Git/_miro/dsx-vision-flow}
       - {cwd: ~/Documents/Git/_miro/dsx-sam-tracking}
+      - {cwd: ~/Documents/Git/_seekingvega/questlit}
+      - {cwd: ~/Documents/Git/_forks/bender}
+      - {cwd: ~/Documents/Git/_GADA_experiments/hfs-svlm-council}
+      - {cwd: ~/Documents/Git/_miro/ds-experiments}
   - name: jupyter
     windows:
       - {cwd: ~/Documents/Git/_miro/clip-cognition,   command: uv run jupyter lab --port 8887}
@@ -31,10 +33,15 @@ sessions:
   - name: ollama
     windows:
       - {cwd: "~", command: ollama serve}
+      - {cwd: "~/.khoj", command: docker-compose up}
   - name: streamlit
     windows:
       - {cwd: ~/Documents/Git/_seekingvega/st-positionIQ, command: uv run streamlit run streamlit_app.py --server.port 8502}
       - {cwd: ~/Documents/Git/_seekingvega/questlit,      command: uv run streamlit run streamlit_app.py --server.port 8501}
+      - {cwd: ~/Documents/Git/_seekingvega/stocklit,      command: uv run streamlit run streamlit_app.py --server.port 8505}
       - {cwd: ~/Documents/Git/_miro/clip-cognition,       command: uv run streamlit run streamlit_demo/deepeval_results_viewer.py}
       - {cwd: ~/Documents/Git/_miro/dsx-sam-tracking,     command: uv run streamlit run streamlit_apps/st_annotated_videos_compare.py}
       - {cwd: ~/Documents/Git/_miro/dsx-sam-tracking,     command: uv run streamlit run streamlit_apps/st_debug_compare.py}
+  - name: datasette
+    windows:
+      - {cwd: "~/Documents/Git/_miro/kikz-2022", command: datasette datasette/oncloud2026.db}
