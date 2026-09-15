@@ -1,11 +1,11 @@
 ---
 name: surge-artifacts
-description: Design and publish standalone HTML pages — reports, explainers, demos, dashboards, mini-sites — to surge.sh at miroai-artifacts-<slug>.surge.sh. Use this whenever the user wants a web page published or shared via surge, asks for a public/shareable URL hosted outside claude.ai, mentions "surge", "surge.sh", or "miroai artifact", or asks to deploy/host a page they can send to teammates. When surge hosting is requested, this skill replaces the built-in Artifact tool flow entirely — do not publish to claude.ai artifacts in that case.
+description: Design and publish standalone HTML pages — reports, explainers, demos, dashboards, mini-sites — to surge.sh at `<namespace>-<slug>.surge.sh` (default namespace `miroai-artifacts`, always confirmed with the user, so personal pages can use their own). Use this whenever the user wants a web page published or shared via surge, asks for a public/shareable URL hosted outside claude.ai, mentions "surge", "surge.sh", "miroai artifact", or a "personal surge page", or asks to deploy/host a page they can send to teammates. When surge hosting is requested, this skill replaces the built-in Artifact tool flow entirely — do not publish to claude.ai artifacts in that case.
 ---
 
 # Surge Artifacts
 
-Publish designed, self-contained web pages to surge.sh under the `miroai-artifacts-*` namespace. This is the surge-hosted equivalent of a claude.ai artifact: you author a complete HTML page, deploy it with the surge CLI, and hand the user a stable public URL they can share.
+Publish designed, self-contained web pages to surge.sh under a namespace the user picks each time — `miroai-artifacts-*` for team work by default, anything else for personal pages. This is the surge-hosted equivalent of a claude.ai artifact: you author a complete HTML page, deploy it with the surge CLI, and hand the user a stable public URL they can share.
 
 The deliverable is the live URL. A page that exists only on disk is not done.
 
@@ -20,20 +20,24 @@ Run these checks before writing any page content, so a missing prerequisite surf
 
 **Where pages live.** Each artifact gets its own directory at the repo root: `surge_artifacts/<slug>/`, with `index.html` as the entry point. This directory persists across sessions — that persistence is what makes redeploys to the same URL possible later, so never write the page to a temp/scratch directory. Make sure `surge_artifacts/` is listed in the repo's `.gitignore` (add it if it isn't) — published page sources are build output, not project code.
 
-**Choosing the slug.** Short kebab-case derived from the page's topic (`clip-search-explainer`, `q3-detector-report`). The domain is always `miroai-artifacts-<slug>.surge.sh`. Before the first publish of a new slug, run `surge list` to see what's already deployed — both to avoid collisions and to notice when the user is actually asking you to update an existing page rather than create a new one. (Deploys under other prefixes, e.g. `surge-artifacts-*`, are older manual experiments — leave them alone, but check them too when hunting for a page the user wants updated.)
+**✋ Choosing the namespace.** Every domain is `<NS>-<slug>.surge.sh`, and `NS` is the user's call on the *first* deploy of every new slug — never assumed from memory, history, or the repo. If `surge_artifacts/<slug>/CNAME` already exists, it *is* the namespace and slug: redeploy with it and skip the question (moving a page to another namespace is a new page in a new slug dir; the old domain stays up until torn down). Otherwise run `surge list` and collect the distinct prefixes already in use: strip `.surge.sh`, then take the part before the slug — in practice the prefixes end in `-artifacts` (`miroai-artifacts`, `alpaca-hackathon-2026-artifacts`, `surge-artifacts`); for a domain that doesn't fit that shape, take its first two dash-separated tokens. This only seeds options, so don't over-engineer it. Then ask with `AskUserQuestion` (single-select): `miroai-artifacts (default — team pages)` first, then one option per other prefix seen with how many pages already sit under it, and say that a new namespace goes under "Other" as kebab-case without the trailing dash. Never skip this question because the answer seems obvious. With `NS` chosen, check that no other dir in `surge_artifacts/` holds a CNAME with the same slug under a different namespace (the layout is flat: one dir per slug); if one does, tell the user and let them pick another slug.
+
+**Choosing the slug.** Short kebab-case derived from the page's topic (`clip-search-explainer`, `q3-detector-report`). The domain is `<NS>-<slug>.surge.sh`. Before the first publish of a new slug, run `surge list` to see what's already deployed — both to avoid collisions and to notice when the user is actually asking you to update an existing page rather than create a new one. Deploys under other prefixes are other namespaces (the namespace question already listed them); check them too when hunting for a page the user wants updated.
+
+**Analytics (ask, don't assume).** Before the *first* deploy of a new slug, ask the user with `AskUserQuestion` whether to add GoatCounter pageview tracking to the page ("yes, via the `goatcounter-tracking` skill" / "no"). On yes, hand off to the `goatcounter-tracking` skill — it asks for the GoatCounter site and path scheme itself and inserts the snippet before `</body>` — then come back here and deploy. Never add the snippet without that answer, and never on a redeploy unless the user asks for tracking.
 
 **Deploying.** Write a `CNAME` file containing the bare domain (no protocol) into the artifact directory, then deploy. The paths below are relative to the repo root, and the working directory can reset between shell calls in agent environments — so run both commands from the repo root in a single invocation, or use absolute paths:
 
 ```bash
-echo "miroai-artifacts-<slug>.surge.sh" > surge_artifacts/<slug>/CNAME && \
-surge ./surge_artifacts/<slug> miroai-artifacts-<slug>.surge.sh
+echo "<NS>-<slug>.surge.sh" > surge_artifacts/<slug>/CNAME && \
+surge ./surge_artifacts/<slug> "$(cat surge_artifacts/<slug>/CNAME)"
 ```
 
-The CNAME file makes the domain durable metadata of the directory itself, so any future session can redeploy without guessing the domain.
+The CNAME file makes the domain — namespace *and* slug — durable metadata of the directory itself, so any future session redeploys by reading it instead of asking again.
 
-**Updating.** Edit the files in the existing `surge_artifacts/<slug>/` directory and run the same surge command — the URL stays stable, exactly like redeploying an artifact. Keep the same slug across updates; a new slug means a new, separate page.
+**Updating.** Edit the files in the existing `surge_artifacts/<slug>/` directory and run the same surge command with the domain read from the CNAME — the URL stays stable, exactly like redeploying an artifact, and the namespace is not asked again. Keep the same slug across updates; a new slug means a new, separate page.
 
-**Verifying.** After every deploy, confirm the page is actually live (`curl -sI https://miroai-artifacts-<slug>.surge.sh` should return 200) before reporting the URL to the user.
+**Verifying.** After every deploy, confirm the page is actually live (`curl -sI "https://$(cat surge_artifacts/<slug>/CNAME)"` should return 200) before reporting the URL to the user. If the page carries a GoatCounter snippet, `curl -s "https://$(cat surge_artifacts/<slug>/CNAME)" | grep -c 'gc.zgo.at/count.js'` should print exactly 1.
 
 **Lifecycle.** `surge list` enumerates all deployed projects. `surge <domain> teardown` removes one — it's destructive and immediate, so confirm with the user before tearing anything down.
 
@@ -110,4 +114,4 @@ For editorial requests, review the plan against the subject before building: if 
 
 ## Wrapping up
 
-Report to the user: the live URL first, then a sentence on what the page contains and where the source lives (`surge_artifacts/<slug>/`) so they know how to ask for updates later.
+Report to the user: the live URL first (and the namespace it sits under), then a sentence on what the page contains and where the source lives (`surge_artifacts/<slug>/`, whose CNAME is all a future session needs to redeploy) so they know how to ask for updates later.
