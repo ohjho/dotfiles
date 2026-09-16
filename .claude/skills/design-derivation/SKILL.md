@@ -9,10 +9,13 @@ description: >-
   style, design, or choose the look of something: "style this page", "design a
   slide about X", "what should this look like", "make it look good", "pick
   colors/fonts/a layout", "give it a visual identity", "design a
-  deck/poster/report", "design tokens", "colour palette for this", or when surge-artifacts,
-  artifact-design, quarto-writeup, or dataviz need a palette and type pairing
-  that does not exist yet. Walks a four-step derivation, writes the token
-  files, then hands off to the execution skills.
+  deck/poster/report", "design tokens", "colour palette for this", "theme my
+  Streamlit app" / `.streamlit/config.toml`, "use my brand colour", "I like
+  this colour", or when surge-artifacts, artifact-design, quarto-writeup,
+  dataviz, or a Streamlit app need a palette and type pairing that does not
+  exist yet. Walks a four-step derivation, proposes a colour scheme and checks
+  it against the user's brand or favourite colour, writes the token files, then
+  hands off to the execution skills.
 ---
 
 # Design derivation
@@ -50,14 +53,19 @@ Ask: *where does this run, and what can't I use?* Constraints aren't obstacles �
 - *Must match an existing brand/system* → adopt its tokens; your job is fit, not novelty. Look for one first: a `design.tokens.json` or `design.md` next to the deliverable, a CLAUDE.md design section, a theme file.
 - *Published on surge.sh* → self-contained, both themes via `prefers-color-scheme`, webfonts allowed (no CSP).
 - *Rendered as a claude.ai artifact* → self-contained, theme-aware with `data-theme` guards, no external assets.
+- *A Streamlit app* (tell-tales: a `.streamlit/` dir, `streamlit` in the dependencies, `import streamlit`) → the theme is **only** what `.streamlit/config.toml` `[theme]` can express: hex colours for ground / secondary ground / text / primary / link / border, three font roles, a radius. No `muted` equivalent, no custom CSS needed, light *and* dark via `[theme.light]` / `[theme.dark]`. Fonts must be installed or loaded from font **files** through `[[theme.fontFaces]]`, so record woff2 URLs (Google Fonts serves them) in the `faces` extension of each font token or fall back to `sans-serif` / `monospace`.
 
 ## The keystone choice
 
 One decision is load-bearing — usually the one that falls out of step 1. Identify it, make it boldly, and make **everything else serve it**. In the heatmap example, "color = signal temperature" is the keystone; once color carries meaning it can't also be decorative, which forces a restrained, disciplined palette. Spend your boldness in one place; keep the rest quiet. A design with three "wow" moments has none.
 
-## Interaction protocol: infer, confirm, and settle the deliverable in one ask
+## Interaction protocol: two asks
 
-Do **not** interrogate the user question-by-question. Infer all four inputs from the request and surrounding context, show your read as a compact block in the message text, then ask **one** `AskUserQuestion` that settles everything before any file is written:
+Do **not** interrogate the user question-by-question. There are exactly two interruptions: **round 1** confirms the read and settles the deliverable; **round 2** checks the proposed colour scheme against what the user already has (a brand colour, a favourite colour, an existing palette). No file is written before both are answered.
+
+### Round 1 — the read and the deliverable
+
+Infer all four inputs from the request and surrounding context, show your read as a compact block in the message text, then ask **one** `AskUserQuestion`:
 
 ```
 Content    → attention over image patches (a heatmap concept)
@@ -75,7 +83,36 @@ The single `AskUserQuestion` carries up to four questions:
 3. **Scope** — `Standard set (Recommended)`: core colour roles, keystone extras, font roles, radius / spacing base / measure. `Full system`: also a spacing scale, type scale, shadows, motion durations, breakpoints. Standard is right for almost every page; full is for an app, a multi-page site, or a design the user will keep extending.
 4. **Finish** — `Brief only` (write the files and stop) or `Build it` (continue into the execution skill). Infer and mark the recommended option from the request: "design a page for me" → build; "what should this look like" → brief.
 
-Once answered, derive the direction and write the files. If the user picked `Adjust`, revise the read, show it again in text, and proceed on their say-so without re-asking questions 2–4.
+If the user picked `Adjust`, revise the read, show it again in text, and proceed on their say-so without re-asking questions 2–4.
+
+### Round 2 — the colour scheme check
+
+Derive the direction (below), then **before writing anything** show the proposed scheme in text — one line per core role with light / dark hex and the reason, plus the keystone extras by name:
+
+```
+accent       #B0480B / #F2A13B   the hot end of the ramp (content)
+bg           #F3F5F4 / #0E1A1D   cool off-white / teal-black so the ramp glows (constraint)
+ink          #17232B / #E6EDEF   (audience)
+muted, line, surface, accent-soft …
+extras       hot · warm · cold   the heat ramp itself
+```
+
+Then ask **one** `AskUserQuestion` with exactly these options, always in this order:
+
+- `Use this proposal (Recommended)`
+- `I have a brand colour` — hex or name under Other
+- `I have a favourite colour` — under Other
+- `Use an existing palette / tokens file` — path under Other
+
+This check runs **every time**, utilitarian memo included — the proposal is just shorter there. Only the user knows about a brand or a colour they love; the derivation cannot infer it.
+
+What happens next:
+
+- **A colour was supplied.** Ask its role in a **follow-up `AskUserQuestion`**, one question per colour (max 4 colours): `accent` / `background` / `keystone extra` / `ink`. Never assume the role. Then build around it with the script: `scheme <hex>` for an accent (it returns all seven core roles for both themes, AA-checked, neutrals hue-biased toward the colour), `tint <hex> --on <ground>` for an ink or extra that needs to clear contrast on its ground. Replace the proposal, run `check`, show the revised scheme once in text, and continue. If the colour fights the keystone metaphor (a cool brand blue in a heat-ramp design), say so in one sentence and let the user's answer stand.
+- **An existing palette / tokens file.** Read it, map its colours onto the core roles, keep its names as keystone extras where they carry meaning, stamp provenance `constraint`, show the mapping, continue.
+- **Proposal accepted.** Continue.
+
+Record the outcome — what was proposed, what the user supplied, which role it took, what changed — in the `## Colour scheme` section of `design.md`.
 
 ## From brief → concrete direction
 
@@ -88,7 +125,7 @@ Collapse the four answers into named choices. Each choice is tied back to the in
 
 ## Writing the deliverables
 
-**Where.** Next to the thing being designed, so the tokens travel with it and a later session finds them without asking: `surge_artifacts/<slug>/design.md` for a surge page, beside the `.qmd` for a Quarto post, in the artifact's scratch folder for a claude.ai artifact, at the project root for a whole app. If a `design.tokens.json` already exists there, you are *extending* it, not replacing it — read it first.
+**Where.** Next to the thing being designed, so the tokens travel with it and a later session finds them without asking: `surge_artifacts/<slug>/design.md` for a surge page, beside the `.qmd` for a Quarto post, in the artifact's scratch folder for a claude.ai artifact, `.streamlit/design.md` + `.streamlit/design.tokens.json` next to `config.toml` for a Streamlit app, at the project root for any other whole app. If a `design.tokens.json` already exists there, you are *extending* it, not replacing it — read it first.
 
 **The tool.** `scripts/design_tokens.py` in the dotfiles repo validates and renders the JSON. From any other project run it remotely:
 
@@ -98,6 +135,9 @@ uv run https://ohjho.github.io/dotfiles/scripts/design_tokens.py render md   des
 uv run https://ohjho.github.io/dotfiles/scripts/design_tokens.py render css  design.tokens.json            # surge / plain html
 uv run https://ohjho.github.io/dotfiles/scripts/design_tokens.py render css  design.tokens.json --artifact # claude.ai artifact
 uv run https://ohjho.github.io/dotfiles/scripts/design_tokens.py render scss design.tokens.json --theme light -o theme-light.scss  # Quarto
+uv run https://ohjho.github.io/dotfiles/scripts/design_tokens.py render streamlit design.tokens.json --into .streamlit/config.toml # Streamlit
+uv run https://ohjho.github.io/dotfiles/scripts/design_tokens.py scheme "#B0480B" [--format json]        # core colours around a user colour
+uv run https://ohjho.github.io/dotfiles/scripts/design_tokens.py tint "#7A3208" --on "#0E1A1D" --min 3   # nearest AA-passing variants
 ```
 
 (Inside the dotfiles repo itself use `uv run scripts/design_tokens.py …`.)
@@ -116,7 +156,7 @@ The **core roles** are a contract — every consumer skill may assume they exist
 | `space` | `base` | `--space` |
 | `measure` | `body` | `--measure` |
 
-**Keystone extras** are the tokens that carry the design's one idea — `hot/warm/cold`, `offline/runtime/db`, `good/warn/bad`. Add as many as the keystone needs, in both themes, and no more; a `-soft` sibling for tinted backgrounds is a common pair. Dimensions use the object form `{"value": 8, "unit": "px"}`; font families are arrays ending in a generic family.
+**Keystone extras** are the tokens that carry the design's one idea — `hot/warm/cold`, `offline/runtime/db`, `good/warn/bad`. Add as many as the keystone needs, in both themes, and no more; a `-soft` sibling for tinted backgrounds is a common pair. Dimensions use the object form `{"value": 8, "unit": "px"}`; font families are arrays ending in a generic family. A font token may carry `"$extensions": {"design-derivation": {"faces": [{"url": "<woff2>", "weight": 400, "style": "normal"}]}}` — the font files Streamlit's `[[theme.fontFaces]]` needs; other renderers ignore it.
 
 **Full system** adds, when chosen: `space.xs … space.xl`, `type.xs … type.xl` (font sizes), `shadow.*`, `motion.duration.*`, `breakpoint.*`. Keep the same naming discipline; the renderer joins paths with dashes (`--space-xl`, `--motion-duration-fast`).
 
@@ -130,6 +170,7 @@ The human brief, structured so a reader can audit every choice:
 # Design: <slug>
 ## Derivation        (table: Input | Read | Produces — the four steps)
 ## Keystone          (one bold sentence, then what it forbids)
+## Colour scheme     (the round-2 proposal, what the user supplied and its role, what changed)
 ## Tokens            (one line on scope + check result, then the markers below)
 <!-- tokens:start -->
 <!-- tokens:end -->
@@ -149,6 +190,7 @@ Never hand-type the token tables: run `render md --into design.md` and the block
 - **`artifact-design`** / the Artifact tool — claude.ai artifacts. Same CSS with `render css --artifact`, which adds the `:root:not([data-theme="light"])` guard and the explicit `:root[data-theme="dark"]` block the artifact contract needs. Reference webfonts are not allowed there, so check `font.*` fallbacks are system faces.
 - **`frontend-design`** — apps and reshaped UI. Hand it the JSON as the token system it would otherwise invent; it owns component craft and anti-cliché judgement from there.
 - **`quarto-writeup`** — blog posts and Reveal.js decks. `render scss --theme light` and `--theme dark` produce Quarto theme files (`scss:defaults` mapping `bg → $body-bg`, `ink → $body-color`, `accent → $link-color`, fonts to the Bootstrap font variables, plus every token as a custom property in `scss:rules`). Reference them from `format.html.theme: {light: [cosmo, theme-light.scss], dark: [cosmo, theme-dark.scss]}`.
+- **Streamlit** (a `.streamlit/` app, no separate skill) — `render streamlit design.tokens.json --into .streamlit/config.toml` merges `[theme]`, `[theme.light]`, `[theme.dark]` and their `.sidebar` tables into the app's config and leaves `[server]` and friends untouched; rerun after every token change. Mapping: `accent → primaryColor + linkColor`, `bg → backgroundColor`, `surface → secondaryBackgroundColor + codeBackgroundColor` (and the sidebar's background), `ink → textColor`, `line → borderColor + dataframeBorderColor`, fonts → `font` / `headingFont` / `codeFont`, `radius.md → baseRadius + buttonRadius`; `muted` is dropped. `[[theme.fontFaces]]` come from the `faces` extension and need a server restart. `--theme light|dark` emits a flat single `[theme]` for Streamlit versions without per-theme tables; `--no-sidebar` skips the sidebar tables. Chart colours are left to Streamlit's defaults — bring in `dataviz` when a chart matters.
 - **`dataviz`** — any chart in the piece. The keystone extras *are* the chart palette: an ordered set (`hot → warm → cold`) is the sequential ramp, a set of peers (`offline / runtime / db`) is the categorical palette, `accent` is the single-series colour. Point dataviz at them instead of its placeholder palette, and let it run its own contrast validator on both themes.
 - **`theme-factory`** — when a pre-set theme fits, use the derived brief to pick or tune one deliberately instead of at random; when none fits, `design.md` *is* the custom theme description its "create your own theme" step asks for, so skip the showcase and apply.
 - **`design`** (Claude Design canvas) — paste the Tokens and Signature-move sections of `design.md` into the canvas brief so the artboards start from the derived palette and type.
@@ -165,7 +207,7 @@ Match effort to the request. A utilitarian memo, plan, or internal note needs on
 
 ## Worked example
 
-`assets/example.design.md` + `assets/example.design.tokens.json` show the method end to end on a hypothetical page: an interactive explainer of how a vision transformer weights image patches, published on surge for ML engineers.
+`assets/example.design.md` + `assets/example.design.tokens.json` show the method end to end on a hypothetical page: an interactive explainer of how a vision transformer weights image patches, published on surge for ML engineers. `assets/example.streamlit.config.toml` is the same token file rendered with `render streamlit`, so you can see the whole Streamlit mapping (including `[[theme.fontFaces]]` from the `faces` extension) on one screen.
 
 | Step | Input | Produced |
 |------|-------|----------|

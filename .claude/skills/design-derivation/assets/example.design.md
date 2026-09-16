@@ -21,9 +21,17 @@ file; the tables below were generated from that file with
 ignores. Because colour now carries meaning it cannot also decorate: every other colour in
 the page stays neutral so the ramp reads as data.
 
+## Colour scheme
+
+Proposed in round 2: the heat ramp as above, accent = the hot end, cool hue-biased neutrals.
+The user had no brand or favourite colour to bring, so the proposal stands unchanged. Had
+they supplied one, its role would have been asked (accent / background / extra / ink) and
+`design_tokens.py scheme <hex>` would have rebuilt the seven core roles around it.
+
 ## Tokens
 
-Standard set (core roles + keystone extras). Both themes checked with `design_tokens.py check`: 0 errors.
+Standard set (core roles + keystone extras). The three font tokens carry `faces` entries
+(Google Fonts woff2 URLs) so the Streamlit render can load IBM Plex. Both themes checked with `design_tokens.py check`: 0 errors.
 
 <!-- tokens:start -->
 | token | light | dark | from | note |
@@ -72,3 +80,4 @@ sans display face. The inputs change the look, so the derivation is rooted in th
 
 - **surge-artifacts**: `design_tokens.py render css example.design.tokens.json` → paste into `<style>` of `surge_artifacts/attention-lab/index.html`.
 - **dataviz**: use `hot → warm → cold` as the sequential ramp for any attention chart; `accent` is already the hot end, so charts and page agree.
+- **Streamlit** (if the lab were a Streamlit app instead): `design_tokens.py render streamlit example.design.tokens.json --into .streamlit/config.toml` → see `example.streamlit.config.toml` for the result.

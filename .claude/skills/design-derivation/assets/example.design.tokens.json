@@ -206,7 +206,14 @@
       "$description": "mono for structure: headings, labels, readouts",
       "$extensions": {
         "design-derivation": {
-          "from": "audience"
+          "from": "audience",
+          "faces": [
+            {
+              "url": "https://fonts.gstatic.com/s/ibmplexmono/v20/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2",
+              "weight": 400,
+              "style": "normal"
+            }
+          ]
         }
       }
     },
@@ -219,7 +226,14 @@
       "$description": "sans for prose; mono tires in paragraphs",
       "$extensions": {
         "design-derivation": {
-          "from": "audience"
+          "from": "audience",
+          "faces": [
+            {
+              "url": "https://fonts.gstatic.com/s/ibmplexsans/v23/zYXGKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1swZSAXcomDVmadSD6llDB6g4tIOm6_De.woff2",
+              "weight": 400,
+              "style": "normal"
+            }
+          ]
         }
       }
     },
@@ -231,7 +245,14 @@
       ],
       "$extensions": {
         "design-derivation": {
-          "from": "audience"
+          "from": "audience",
+          "faces": [
+            {
+              "url": "https://fonts.gstatic.com/s/ibmplexmono/v20/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2",
+              "weight": 400,
+              "style": "normal"
+            }
+          ]
         }
       }
     }

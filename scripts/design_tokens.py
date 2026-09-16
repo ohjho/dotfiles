@@ -1,19 +1,22 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["typer>=0.12", "loguru>=0.7"]
+# dependencies = ["typer>=0.12", "loguru>=0.7", "tomlkit>=0.12"]
 # ///
 """Validate and render a W3C DTCG ``design.tokens.json`` written by the design-derivation skill.
 
 The skill derives a visual direction and records it as ``design.md`` (the reasons) and
 ``design.tokens.json`` (the values, in the W3C Design Tokens Community Group format).
 This script is the bridge to the skills that consume those values, so nobody hand
-translates hex codes into CSS, Markdown, or SCSS::
+translates hex codes into CSS, Markdown, SCSS, or a Streamlit theme::
 
     uv run scripts/design_tokens.py check design.tokens.json
     uv run scripts/design_tokens.py render css  design.tokens.json            # :root + dark media query
     uv run scripts/design_tokens.py render css  design.tokens.json --artifact # + data-theme guards
     uv run scripts/design_tokens.py render md   design.tokens.json --into design.md
     uv run scripts/design_tokens.py render scss design.tokens.json --theme dark -o theme-dark.scss
+    uv run scripts/design_tokens.py render streamlit design.tokens.json --into .streamlit/config.toml
+    uv run scripts/design_tokens.py tint "#B0480B" --on "#0E1A1D" --min 3    # AA-passing variants
+    uv run scripts/design_tokens.py scheme "#B0480B" --format json           # core colours around a brand colour
 
 Token file shape (colors live in one ``light`` and one ``dark`` set, everything else is
 shared)::
@@ -25,7 +28,9 @@ shared)::
                          "$extensions": {"design-derivation": {"from": "constraint"}}}, ...},
         "dark":  {"bg": {"$type": "color", "$value": "#10161D"}, ...}
       },
-      "font":    {"display": {"$type": "fontFamily", "$value": ["Fraunces", "serif"]}, ...},
+      "font":    {"display": {"$type": "fontFamily", "$value": ["Fraunces", "serif"],
+                              "$extensions": {"design-derivation": {"faces": [
+                                  {"url": "https://.../fraunces.woff2", "weight": 400, "style": "normal"}]}}}, ...},
       "radius":  {"md":   {"$type": "dimension", "$value": {"value": 8,  "unit": "px"}}},
       "space":   {"base": {"$type": "dimension", "$value": {"value": 8,  "unit": "px"}}},
       "measure": {"body": {"$type": "dimension", "$value": {"value": 65, "unit": "ch"}}}
@@ -36,17 +41,24 @@ line accent accent-soft``; ``font.display``/``font.body``; ``radius.md``, ``spac
 ``measure.body``), light/dark parity, valid hex colours, and WCAG AA contrast on the
 ink/muted/accent-on-ground pairs. Extra colour tokens that carry the design's keystone
 (``hot``/``cold``, ``offline``/``runtime``) are welcome and only get contrast *warnings*.
+
+``render streamlit`` maps the core roles onto ``[theme]`` / ``[theme.light]`` / ``[theme.dark]``
+(and their ``.sidebar`` tables) for ``.streamlit/config.toml``; ``--into`` merges the theme into
+an existing config while keeping every other table. ``tint`` and ``scheme`` help the
+design-derivation skill build an AA-passing palette around a colour the user supplies.
 """
 
 from __future__ import annotations
 
+import colorsys
 import json
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+import tomlkit
 import typer
 from loguru import logger
 
@@ -85,6 +97,28 @@ SCSS_FONT_MAP = (
     ("font-family-monospace", "mono"),
 )
 
+# Streamlit .streamlit/config.toml [theme] options fed from the core roles (hex only).
+STREAMLIT_COLOR_MAP = (
+    ("primaryColor", "accent"),
+    ("backgroundColor", "bg"),
+    ("secondaryBackgroundColor", "surface"),
+    ("textColor", "ink"),
+    ("linkColor", "accent"),
+    ("borderColor", "line"),
+    ("dataframeBorderColor", "line"),
+    ("codeBackgroundColor", "surface"),
+)
+STREAMLIT_SIDEBAR_MAP = (("backgroundColor", "surface"), ("secondaryBackgroundColor", "bg"))
+STREAMLIT_FONT_MAP = (("font", "body"), ("headingFont", "display"), ("codeFont", "mono"))
+FACE_KEYS = {"url", "weight", "style", "unicodeRange"}
+
+# `scheme`: lightness ladders (0..1) for the neutral roles, per theme.
+SCHEME_LIGHTNESS = {
+    "light": {"bg": 0.96, "surface": 0.99, "ink": 0.12, "muted": 0.40, "line": 0.88, "accent-soft": 0.92},
+    "dark": {"bg": 0.09, "surface": 0.13, "ink": 0.92, "muted": 0.66, "line": 0.24, "accent-soft": 0.20},
+}
+SOFT_SATURATION = {"light": 0.45, "dark": 0.35}
+
 app = typer.Typer(
     add_completion=False,
     help="Validate and render a DTCG design.tokens.json into CSS, Markdown, or Quarto SCSS.",
@@ -102,6 +136,7 @@ class Token:
         description: The token's ``$description`` (may be empty).
         source: Which derivation input produced it, from
             ``$extensions["design-derivation"]["from"]`` (may be empty).
+        ext: The whole ``$extensions["design-derivation"]`` object (e.g. ``faces`` on fonts).
     """
 
     path: tuple[str, ...]
@@ -109,6 +144,7 @@ class Token:
     value: Any
     description: str = ""
     source: str = ""
+    ext: dict = field(default_factory=dict)
 
     @property
     def name(self) -> str:
@@ -197,8 +233,8 @@ def flatten(tree: dict, prefix: tuple[str, ...] = (), inherited_type: Optional[s
         >>> flatten({"$description": "meta only"})
         []
         >>> t = flatten({"x": {"$value": "#fff", "$extensions": {"design-derivation": {"from": "goal"}}}})[0]
-        >>> t.source, t.type
-        ('goal', None)
+        >>> t.source, t.type, t.ext
+        ('goal', None, {'from': 'goal'})
     """
     tokens: list[Token] = []
     group_type = tree.get("$type", inherited_type)
@@ -208,13 +244,16 @@ def flatten(tree: dict, prefix: tuple[str, ...] = (), inherited_type: Optional[s
         path = prefix + (key,)
         if "$value" in node:
             ext = node.get("$extensions", {}).get(PROVENANCE_EXT, {})
+            if not isinstance(ext, dict):
+                ext = {}
             tokens.append(
                 Token(
                     path=path,
                     type=node.get("$type", group_type),
                     value=node["$value"],
                     description=str(node.get("$description", "")),
-                    source=str(ext.get("from", "")) if isinstance(ext, dict) else "",
+                    source=str(ext.get("from", "")),
+                    ext=ext,
                 )
             )
         else:
@@ -317,6 +356,172 @@ def contrast_ratio(fg: str, bg: str) -> float:
     return round((l1 + 0.05) / (l2 + 0.05), 4)
 
 
+def hex_to_hsl(value: str) -> tuple[float, float, float]:
+    """Hex colour → ``(hue, saturation, lightness)`` each in ``0..1``.
+
+    Examples:
+        >>> hex_to_hsl("#ffffff")
+        (0.0, 0.0, 1.0)
+        >>> h, s, l = hex_to_hsl("#B0480B"); round(h * 360), round(s, 2), round(l, 2)
+        (22, 0.88, 0.37)
+    """
+    r, g, b = parse_hex(value)
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    return (h, s, l)
+
+
+def hsl_to_hex(h: float, s: float, l: float) -> str:
+    """``(hue, saturation, lightness)`` in ``0..1`` → upper-case ``#RRGGBB`` (clamped).
+
+    Examples:
+        >>> hsl_to_hex(0.0, 0.0, 1.0)
+        '#FFFFFF'
+        >>> hsl_to_hex(*hex_to_hsl("#B0480B"))
+        '#B0480B'
+        >>> hsl_to_hex(0.5, 0.5, 1.4)
+        '#FFFFFF'
+    """
+    l = min(1.0, max(0.0, l))
+    s = min(1.0, max(0.0, s))
+    r, g, b = colorsys.hls_to_rgb(h % 1.0, l, s)
+    return "#" + "".join(f"{round(c * 255):02X}" for c in (r, g, b))
+
+
+def adjust_to_contrast(color: str, ground: str, minimum: float, direction: str = "auto") -> Optional[str]:
+    """Nearest variant of ``color`` (same hue and saturation) reaching ``minimum`` contrast on ``ground``.
+
+    Lightness is stepped 1% at a time. ``direction`` is ``lighter``, ``darker``, or ``auto``
+    (whichever passing variant is closest to the original). A colour that already passes is
+    returned unchanged.
+
+    Returns:
+        The hex variant, or ``None`` when no lightness in that direction reaches the target.
+
+    Examples:
+        >>> adjust_to_contrast("#B0480B", "#F3F5F4", 3.0)
+        '#B0480B'
+        >>> v = adjust_to_contrast("#7A3208", "#0E1A1D", 3.0, "lighter"); v, contrast_ratio(v, "#0E1A1D") >= 3.0
+        ('#AA460B', True)
+        >>> adjust_to_contrast("#7A3208", "#0E1A1D", 3.0, "darker") is None
+        True
+        >>> adjust_to_contrast("#777777", "#777777", 4.5, "auto")  # darker is the smaller lightness move
+        '#040404'
+    """
+    if direction not in ("auto", "lighter", "darker"):
+        raise ValueError(f"direction must be auto, lighter or darker, not {direction!r}")
+    if contrast_ratio(color, ground) >= minimum:
+        return hsl_to_hex(*hex_to_hsl(color))
+    h, s, l0 = hex_to_hsl(color)
+    candidates: list[tuple[float, str]] = []
+    for sign in ((1,) if direction == "lighter" else (-1,) if direction == "darker" else (1, -1)):
+        for step in range(1, 101):
+            l = l0 + sign * step / 100
+            if not 0.0 <= l <= 1.0:
+                break
+            candidate = hsl_to_hex(h, s, l)
+            if contrast_ratio(candidate, ground) >= minimum:
+                candidates.append((abs(l - l0), candidate))
+                break
+    return min(candidates)[1] if candidates else None
+
+
+def tint_candidates(color: str, ground: str, minimum: float) -> dict[str, Optional[str]]:
+    """Both directional answers of :func:`adjust_to_contrast`, for the ``tint`` command.
+
+    Examples:
+        >>> c = tint_candidates("#7A3208", "#0E1A1D", 3.0)
+        >>> sorted(c), c["darker"], c["lighter"]
+        (['darker', 'lighter'], None, '#AA460B')
+    """
+    return {d: adjust_to_contrast(color, ground, minimum, d) for d in ("lighter", "darker")}
+
+
+def build_scheme(accent: str, bias: float = 0.08) -> dict:
+    """Propose the seven core colour roles for both themes around one accent colour.
+
+    Neutrals borrow the accent's hue at ``bias`` saturation so they read as chosen rather than
+    default grey; lightness follows :data:`SCHEME_LIGHTNESS`. The accent itself is darkened on
+    the light ground / lightened on the dark ground only as far as WCAG AA (3.0) requires, and
+    ``muted`` is nudged until it reaches 3.0 on both grounds. Provenance is stamped
+    ``constraint`` (a user preference).
+
+    Returns:
+        A DTCG ``color`` group (``{"light": {...}, "dark": {...}}``) ready to drop into a
+        ``design.tokens.json``.
+
+    Examples:
+        >>> group = build_scheme("#7A3208")
+        >>> sorted(group)
+        ['dark', 'light']
+        >>> group["light"]["accent"]["$value"], group["dark"]["accent"]["$value"]  # dark variant lightened to reach 3.0
+        ('#7A3208', '#AA460B')
+        >>> group["light"]["bg"]["$extensions"]["design-derivation"]["from"]
+        'constraint'
+        >>> stub = {"color": group, "font": {"$type": "fontFamily", "display": {"$value": ["x"]}, "body": {"$value": ["y"]}, "mono": {"$value": ["z"]}},
+        ...         "radius": {"md": {"$type": "dimension", "$value": "4px"}}, "space": {"base": {"$type": "dimension", "$value": "8px"}},
+        ...         "measure": {"body": {"$type": "dimension", "$value": "65ch"}}}
+        >>> [i.message for i in find_issues(stub) if i.level == "error"]
+        []
+        >>> build_scheme("#00FF00")["light"]["accent"]["$value"] != "#00FF00"  # too light for AA, darkened
+        True
+    """
+    h, s, _ = hex_to_hsl(accent)
+    accent_norm = hsl_to_hex(h, s, hex_to_hsl(accent)[2])
+
+    def token(value: str, note: str) -> dict:
+        return {
+            "$type": "color",
+            "$value": value,
+            "$description": note,
+            "$extensions": {PROVENANCE_EXT: {"from": "constraint"}},
+        }
+
+    group: dict = {}
+    for theme in THEMES:
+        ladder = SCHEME_LIGHTNESS[theme]
+        bg = hsl_to_hex(h, bias, ladder["bg"])
+        surface = hsl_to_hex(h, bias / 2, ladder["surface"])
+        ink = hsl_to_hex(h, bias, ladder["ink"])
+        line = hsl_to_hex(h, bias, ladder["line"])
+        away = -1 if theme == "light" else 1
+        muted_l = ladder["muted"]
+        muted = hsl_to_hex(h, bias, muted_l)
+        while (contrast_ratio(muted, bg) < 3.0 or contrast_ratio(muted, surface) < 3.0) and 0.0 < muted_l < 1.0:
+            muted_l += away * 0.01
+            muted = hsl_to_hex(h, bias, muted_l)
+        direction = "darker" if theme == "light" else "lighter"
+        accent_theme = adjust_to_contrast(accent_norm, bg, 3.0, direction) or adjust_to_contrast(accent_norm, bg, 3.0, "auto") or accent_norm
+        soft = hsl_to_hex(h, SOFT_SATURATION[theme], ladder["accent-soft"])
+        group[theme] = {
+            "bg": token(bg, f"neutral ground, hue-biased toward {accent_norm}"),
+            "surface": token(surface, "cards and panels"),
+            "ink": token(ink, "body text"),
+            "muted": token(muted, "secondary text, >= 3.0 on both grounds"),
+            "line": token(line, "rules and borders"),
+            "accent": token(accent_theme, f"user colour {accent_norm}" + ("" if accent_theme == accent_norm else " adjusted to reach WCAG AA 3.0 on bg")),
+            "accent-soft": token(soft, "tinted backgrounds for callouts and chips"),
+        }
+    return group
+
+
+def render_scheme_table(group: dict) -> str:
+    """Markdown table for a :func:`build_scheme` result: role, both values, contrast on bg.
+
+    Examples:
+        >>> print(render_scheme_table(build_scheme("#B0480B")).splitlines()[2])
+        | bg | `#F6F5F4` | `#191615` | — |
+    """
+    lines = ["| role | light | dark | contrast on bg (light / dark) |", "|---|---|---|---|"]
+    for role in CORE_COLORS:
+        light, dark = group["light"][role]["$value"], group["dark"][role]["$value"]
+        if role in ("bg", "surface", "accent-soft", "line"):
+            ratio = "—"
+        else:
+            ratio = f"{contrast_ratio(light, group['light']['bg']['$value']):.2f} / {contrast_ratio(dark, group['dark']['bg']['$value']):.2f}"
+        lines.append(f"| {role} | `{light}` | `{dark}` | {ratio} |")
+    return "\n".join(lines) + "\n"
+
+
 # --------------------------------------------------------------------------- validation
 
 
@@ -407,6 +612,8 @@ def find_issues(tree: dict, allow_single_theme: bool = False) -> list[Issue]:
         bad_font = not isinstance(token.value, (list, str)) or (isinstance(token.value, list) and not token.value)
         if token.path[:1] == ("font",) and bad_font:
             issues.append(Issue("error", f"{'.'.join(token.path)}: fontFamily $value must be a non-empty list or string"))
+        if token.path[:1] == ("font",):
+            issues.extend(_face_issues(token))
 
     for group, name in CORE_LAYOUT:
         if find_token(tokens, group, name) is None:
@@ -414,6 +621,36 @@ def find_issues(tree: dict, allow_single_theme: bool = False) -> list[Issue]:
     for token in tokens:
         if token.type == "dimension" and not _valid_dimension(token.value):
             issues.append(Issue("error", f"{'.'.join(token.path)}: dimension $value must be {{\"value\": <number>, \"unit\": <str>}} or a CSS length string"))
+    return issues
+
+
+def _face_issues(token: Token) -> list[Issue]:
+    """Warnings for malformed ``faces`` entries (font files for Streamlit's ``[[theme.fontFaces]]``).
+
+    Examples:
+        >>> ok = Token(("font", "body"), "fontFamily", ["Inter"], ext={"faces": [{"url": "https://x/i.woff2", "weight": 400}]})
+        >>> _face_issues(ok)
+        []
+        >>> bad = Token(("font", "body"), "fontFamily", ["Inter"], ext={"faces": [{"weight": 400, "src": "x"}]})
+        >>> [i.message for i in _face_issues(bad)]
+        ['font.body faces[0]: missing url', "font.body faces[0]: unknown key(s) ['src'] (allowed: style, unicodeRange, url, weight)"]
+        >>> [i.message for i in _face_issues(Token(("font", "body"), None, "x", ext={"faces": "nope"}))]
+        ['font.body faces: must be a list of {url, weight?, style?, unicodeRange?}']
+    """
+    faces = token.ext.get("faces")
+    if faces is None:
+        return []
+    name = ".".join(token.path)
+    if not isinstance(faces, list):
+        return [Issue("warning", f"{name} faces: must be a list of {{url, weight?, style?, unicodeRange?}}")]
+    issues = []
+    for i, face in enumerate(faces):
+        if not isinstance(face, dict) or not isinstance(face.get("url"), str):
+            issues.append(Issue("warning", f"{name} faces[{i}]: missing url"))
+        if isinstance(face, dict):
+            unknown = sorted(set(face) - FACE_KEYS)
+            if unknown:
+                issues.append(Issue("warning", f"{name} faces[{i}]: unknown key(s) {unknown} (allowed: {', '.join(sorted(FACE_KEYS))})"))
     return issues
 
 
@@ -596,6 +833,162 @@ def render_scss(tree: dict, theme: str = "light") -> str:
     return "\n".join(defaults) + "\n\n" + "\n".join(rules) + "\n"
 
 
+def format_font_plain(token: Token) -> str:
+    """Font family list as Streamlit wants it: comma-separated, no inner quotes.
+
+    Examples:
+        >>> format_font_plain(Token(("font", "body"), "fontFamily", ["IBM Plex Sans", "system-ui", "sans-serif"]))
+        'IBM Plex Sans, system-ui, sans-serif'
+        >>> format_font_plain(Token(("font", "body"), "fontFamily", "Georgia"))
+        'Georgia'
+    """
+    return ", ".join(token.value) if isinstance(token.value, list) else str(token.value)
+
+
+def _toml_value(value: Any) -> str:
+    """TOML literal for a str / int / float / bool.
+
+    Examples:
+        >>> _toml_value("#FFF"), _toml_value(400), _toml_value(True), _toml_value(1.5)
+        ('"#FFF"', '400', 'true', '1.5')
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return json.dumps(str(value))
+
+
+def _streamlit_colour_lines(colours: dict[str, Token]) -> list[str]:
+    return [f"{opt} = {_toml_value(colours[role].value)}" for opt, role in STREAMLIT_COLOR_MAP if role in colours]
+
+
+def _streamlit_sidebar_lines(colours: dict[str, Token]) -> list[str]:
+    return [f"{opt} = {_toml_value(colours[role].value)}" for opt, role in STREAMLIT_SIDEBAR_MAP if role in colours]
+
+
+def _streamlit_shared_lines(tokens: list[Token]) -> list[str]:
+    lines = []
+    for opt, role in STREAMLIT_FONT_MAP:
+        token = find_token(tokens, "font", role)
+        if token is not None:
+            lines.append(f"{opt} = {_toml_value(format_font_plain(token))}")
+    radius = find_token(tokens, "radius", "md")
+    if radius is not None:
+        lines.append(f"baseRadius = {_toml_value(format_value(radius))}")
+        lines.append(f"buttonRadius = {_toml_value(format_value(radius))}")
+    return lines
+
+
+def _streamlit_font_faces(tokens: list[Token]) -> list[str]:
+    blocks: list[str] = []
+    seen: set[tuple] = set()
+    for token in tokens:
+        if token.path[:1] != ("font",) or not isinstance(token.ext.get("faces"), list):
+            continue
+        family = token.value[0] if isinstance(token.value, list) else str(token.value)
+        for face in token.ext["faces"]:
+            if not isinstance(face, dict) or "url" not in face:
+                continue
+            key = (family, face["url"], face.get("weight"), face.get("style"))
+            if key in seen:
+                continue
+            seen.add(key)
+            body = [f"family = {_toml_value(family)}", f"url = {_toml_value(face['url'])}"]
+            body += [f"{k} = {_toml_value(face[k])}" for k in ("weight", "style", "unicodeRange") if k in face]
+            blocks.append("[[theme.fontFaces]]\n" + "\n".join(body))
+    return blocks
+
+
+def render_streamlit(tree: dict, theme: Optional[str] = None, sidebar: bool = True) -> str:
+    """Render the tokens as Streamlit ``[theme]`` tables for ``.streamlit/config.toml``.
+
+    With ``theme=None`` (default) the output is dual: ``[theme]`` carries ``base``, fonts and
+    radius, ``[theme.light]`` / ``[theme.dark]`` carry the colours, each with a ``.sidebar``
+    table (sidebar background = ``surface``). With ``theme="light"`` or ``"dark"`` a single
+    flat ``[theme]`` is emitted for Streamlit versions without per-theme tables.
+    ``[[theme.fontFaces]]`` entries come from the ``faces`` extension on font tokens.
+    ``muted`` has no Streamlit option and is skipped.
+
+    Examples:
+        >>> toml = render_streamlit(sample_tree())
+        >>> import tomlkit; doc = tomlkit.parse(toml)
+        >>> doc["theme"]["base"], doc["theme"]["light"]["primaryColor"], doc["theme"]["dark"]["backgroundColor"]
+        ('light', '#2B5FC7', '#10161D')
+        >>> doc["theme"]["light"]["sidebar"]["backgroundColor"], doc["theme"]["font"]
+        ('#FFFFFF', 'Inter, sans-serif')
+        >>> doc["theme"]["baseRadius"]
+        '8px'
+        >>> flat = tomlkit.parse(render_streamlit(sample_tree(), theme="dark", sidebar=False))
+        >>> flat["theme"]["base"], flat["theme"]["textColor"], "light" in flat["theme"], "sidebar" in flat["theme"]
+        ('dark', '#E7EDF2', False, False)
+        >>> t = sample_tree(); t["font"]["body"]["$extensions"] = {"design-derivation": {"faces": [{"url": "https://x/inter.woff2", "weight": 400}]}}
+        >>> faces = tomlkit.parse(render_streamlit(t))["theme"]["fontFaces"]
+        >>> faces[0]["family"], faces[0]["url"], faces[0]["weight"]
+        ('Inter', 'https://x/inter.woff2', 400)
+        >>> render_streamlit(sample_tree(), theme="sepia")
+        Traceback (most recent call last):
+        ...
+        ValueError: theme must be light or dark, not 'sepia'
+    """
+    if theme is not None and theme not in THEMES:
+        raise ValueError(f"theme must be light or dark, not {theme!r}")
+    tokens = flatten(tree)
+    header = [
+        "[theme]",
+        "# generated by design_tokens.py from design.tokens.json — edit the JSON, not this",
+        "# `muted` has no Streamlit option; [[theme.fontFaces]] changes need a server restart",
+    ]
+    if theme is not None:
+        colours = color_set(tokens, theme)
+        if not colours:
+            raise ValueError(f"no colour set named {theme!r}")
+        parts = ["\n".join(header + [f"base = {_toml_value(theme)}"] + _streamlit_colour_lines(colours) + _streamlit_shared_lines(tokens))]
+        parts += _streamlit_font_faces(tokens)
+        if sidebar:
+            parts.append("\n".join(["[theme.sidebar]"] + _streamlit_sidebar_lines(colours)))
+        return "\n\n".join(parts) + "\n"
+
+    parts = ["\n".join(header + ['base = "light"'] + _streamlit_shared_lines(tokens))]
+    parts += _streamlit_font_faces(tokens)
+    for name in THEMES:
+        colours = color_set(tokens, name)
+        if not colours:
+            continue
+        parts.append("\n".join([f"[theme.{name}]"] + _streamlit_colour_lines(colours)))
+        if sidebar:
+            parts.append("\n".join([f"[theme.{name}.sidebar]"] + _streamlit_sidebar_lines(colours)))
+    return "\n\n".join(parts) + "\n"
+
+
+def merge_streamlit_config(existing: str, rendered: str) -> str:
+    """Replace the ``theme`` table of an existing ``config.toml`` with ``rendered``, keeping the rest.
+
+    Every other table, key and comment in ``existing`` survives (tomlkit round-trips them);
+    the old ``[theme*]`` tables are dropped wholesale so stale keys never linger.
+
+    Examples:
+        >>> old = '# my app\\n[server]\\nport = 8502  # keep me\\n\\n[theme]\\nprimaryColor = "#000"\\n\\n[theme.light]\\ntextColor = "#111"\\n'
+        >>> merged = merge_streamlit_config(old, render_streamlit(sample_tree()))
+        >>> import tomlkit; doc = tomlkit.parse(merged)
+        >>> doc["server"]["port"], doc["theme"]["light"]["textColor"], "primaryColor" in doc["theme"]
+        (8502, '#1B2733', False)
+        >>> "# keep me" in merged and "# my app" in merged
+        True
+        >>> merge_streamlit_config(merged, render_streamlit(sample_tree())) == merged
+        True
+        >>> tomlkit.parse(merge_streamlit_config("", render_streamlit(sample_tree())))["theme"]["base"]
+        'light'
+    """
+    doc = tomlkit.parse(existing)
+    if "theme" in doc:
+        del doc["theme"]
+    new = tomlkit.parse(rendered)
+    doc["theme"] = new["theme"]
+    text = tomlkit.dumps(doc)
+    return text if text.endswith("\n") else text + "\n"
+
+
 def splice_between_markers(text: str, block: str) -> str:
     """Replace whatever sits between the tokens markers in ``design.md`` with ``block``.
 
@@ -668,16 +1061,23 @@ def check(
 
 @app.command()
 def render(
-    target: str = typer.Argument(..., help="css | md | scss"),
+    target: str = typer.Argument(..., help="css | md | scss | streamlit"),
     tokens: Path = typer.Argument(..., help="Path to design.tokens.json."),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Write here instead of stdout."),
-    into: Optional[Path] = typer.Option(None, "--into", help="md only: rewrite the block between the tokens markers of this design.md in place."),
-    theme: str = typer.Option("light", "--theme", help="scss only: which colour set to render (light | dark)."),
+    into: Optional[Path] = typer.Option(None, "--into", help="md: rewrite the block between the tokens markers of this design.md. streamlit: merge the [theme] tables into this config.toml (created if missing)."),
+    theme: Optional[str] = typer.Option(None, "--theme", help="scss: which colour set (light | dark, default light). streamlit: emit a flat single-theme [theme] instead of [theme.light]/[theme.dark]."),
     artifact: bool = typer.Option(False, "--artifact", help="css only: add the data-theme guards for claude.ai artifacts."),
+    no_sidebar: bool = typer.Option(False, "--no-sidebar", help="streamlit only: skip the [theme.*.sidebar] tables."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Debug logging."),
 ) -> None:
-    """Render the tokens as CSS custom properties, Markdown tables, or a Quarto SCSS theme."""
+    """Render the tokens as CSS custom properties, Markdown tables, a Quarto SCSS theme, or a Streamlit theme."""
     configure_logging(verbose)
+    if no_sidebar and target != "streamlit":
+        logger.error("--no-sidebar only applies to the streamlit target")
+        raise typer.Exit(code=2)
+    if theme is not None and target not in ("scss", "streamlit"):
+        logger.error("--theme only applies to the scss and streamlit targets")
+        raise typer.Exit(code=2)
     tree = load_tokens(tokens)
     try:
         if target == "css":
@@ -685,31 +1085,108 @@ def render(
         elif target == "md":
             text = render_md(tree)
         elif target == "scss":
-            text = render_scss(tree, theme=theme)
+            text = render_scss(tree, theme=theme or "light")
+        elif target == "streamlit":
+            text = render_streamlit(tree, theme=theme, sidebar=not no_sidebar)
         else:
-            logger.error("unknown render target {!r}; expected css, md, or scss", target)
+            logger.error("unknown render target {!r}; expected css, md, scss, or streamlit", target)
             raise typer.Exit(code=2)
     except ValueError as exc:
         logger.error("{}", exc)
         raise typer.Exit(code=2)
 
     if into is not None:
-        if target != "md":
-            logger.error("--into only applies to the md target")
-            raise typer.Exit(code=2)
-        if not into.is_file():
-            logger.error("design.md not found: {}", into)
-            raise typer.Exit(code=2)
-        try:
-            into.write_text(splice_between_markers(into.read_text(encoding="utf-8"), text), encoding="utf-8")
-        except ValueError as exc:
-            logger.error("{}", exc)
-            raise typer.Exit(code=2)
-        logger.info("updated token tables in {}", into)
-        return
+        if target == "md":
+            if not into.is_file():
+                logger.error("design.md not found: {}", into)
+                raise typer.Exit(code=2)
+            try:
+                into.write_text(splice_between_markers(into.read_text(encoding="utf-8"), text), encoding="utf-8")
+            except ValueError as exc:
+                logger.error("{}", exc)
+                raise typer.Exit(code=2)
+            logger.info("updated token tables in {}", into)
+            return
+        if target == "streamlit":
+            existing = into.read_text(encoding="utf-8") if into.is_file() else ""
+            try:
+                merged = merge_streamlit_config(existing, text)
+            except tomlkit.exceptions.TOMLKitError as exc:
+                logger.error("cannot parse {}: {}", into, exc)
+                raise typer.Exit(code=2)
+            into.parent.mkdir(parents=True, exist_ok=True)
+            into.write_text(merged, encoding="utf-8")
+            logger.info("{} [theme] tables in {}", "updated" if existing else "created", into)
+            return
+        logger.error("--into only applies to the md and streamlit targets")
+        raise typer.Exit(code=2)
     if output is not None:
         output.write_text(text, encoding="utf-8")
         logger.info("wrote {} ({} bytes)", output, len(text))
+        return
+    typer.echo(text, nl=False)
+
+
+def _parse_colour_arg(value: str) -> str:
+    """Validate a CLI colour argument; exits 2 when it is not a hex colour."""
+    try:
+        parse_hex(value)
+    except ValueError as exc:
+        logger.error("{}", exc)
+        raise typer.Exit(code=2)
+    return value
+
+
+@app.command()
+def tint(
+    color: str = typer.Argument(..., help="Hex colour to adjust, e.g. '#B0480B'."),
+    on: str = typer.Option(..., "--on", help="Hex ground the colour must contrast against."),
+    minimum: float = typer.Option(4.5, "--min", help="Contrast target (4.5 text, 3.0 large text / UI)."),
+    direction: str = typer.Option("auto", "--direction", help="auto | lighter | darker"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Debug logging."),
+) -> None:
+    """Find the nearest lighter/darker variants of a colour that reach a contrast target on a ground."""
+    configure_logging(verbose)
+    color, on = _parse_colour_arg(color), _parse_colour_arg(on)
+    typer.echo(f"{color} on {on}: contrast {contrast_ratio(color, on):.2f} (target {minimum})")
+    if direction == "auto":
+        found = tint_candidates(color, on, minimum)
+    else:
+        try:
+            found = {direction: adjust_to_contrast(color, on, minimum, direction)}
+        except ValueError as exc:
+            logger.error("{}", exc)
+            raise typer.Exit(code=2)
+    for name, variant in found.items():
+        if variant is None:
+            typer.echo(f"{name:<8} none reaches {minimum}")
+        else:
+            typer.echo(f"{name:<8} {variant}  contrast {contrast_ratio(variant, on):.2f}")
+    if all(v is None for v in found.values()):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def scheme(
+    accent: str = typer.Argument(..., help="The user's brand or favourite colour, hex."),
+    bias: float = typer.Option(0.08, "--bias", help="Saturation of the neutrals borrowed from the accent hue (0 = pure grey)."),
+    fmt: str = typer.Option("table", "--format", "-f", help="table | json (a DTCG `color` group to paste into design.tokens.json)."),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Write here instead of stdout."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Debug logging."),
+) -> None:
+    """Propose the seven core colour roles for light and dark around one colour, AA-checked."""
+    configure_logging(verbose)
+    group = build_scheme(_parse_colour_arg(accent), bias=bias)
+    if fmt == "json":
+        text = json.dumps({"color": group}, indent=2) + "\n"
+    elif fmt == "table":
+        text = render_scheme_table(group)
+    else:
+        logger.error("unknown format {!r}; expected table or json", fmt)
+        raise typer.Exit(code=2)
+    if output is not None:
+        output.write_text(text, encoding="utf-8")
+        logger.info("wrote {}", output)
         return
     typer.echo(text, nl=False)
 
