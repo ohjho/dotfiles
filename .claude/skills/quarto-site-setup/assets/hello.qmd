@@ -1,0 +1,11 @@
+---
+title: "{{hello_title}}"
+date: "{{today}}"
+categories: [{{category}}]
+description: "{{one sentence: what this site will cover and what comes next.}}"
+toc: false
+---
+
+{{paragraph 1: the question or problem the project starts from, in the brief's own terms.}}
+
+{{paragraph 2: what the first real posts will look at, and what is already known or built.}}

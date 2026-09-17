@@ -1,0 +1,33 @@
+# End-state shape of _quarto.yml after quarto-site-setup. Merge these keys into the
+# existing file key by key; keep user keys this skill does not own (editor, execute, output-dir).
+# {{...}} are filled from the step-1 brief; lines marked (optional) are dropped when not chosen.
+project:
+  type: website
+  render:
+    - "**/*.qmd"
+
+website:
+  title: "{{site_title}}"
+  site-url: {{site_url}}            # https://OWNER.github.io/REPO, or https://OWNER.github.io for a user site; no trailing slash
+  description: "{{one_line_description}}"
+  llms-txt: true
+  navbar:
+    right:
+      - text: Posts
+        href: posts.qmd
+      - about.qmd                  # (optional) only when the About page is kept
+      - icon: github
+        href: https://github.com/{{owner}}/{{repo}}
+      # (optional) extra links from step 1, e.g.
+      # - icon: bluesky
+      #   href: https://bsky.app/profile/{{handle}}
+
+format:
+  html:
+    # Step 2 writes `theme: [cosmo]`; step 3 replaces it with the block below.
+    # Themes are rendered from design.tokens.json; see design.md. Edit the JSON, not the theme-*.scss files.
+    theme:
+      light: [cosmo, theme-light.scss, site.scss]
+      dark: [cosmo, theme-dark.scss, site.scss]
+    css: styles.css
+    # Step 4 (goatcounter-tracking) adds `include-in-header: - text: |` here, under format.html.

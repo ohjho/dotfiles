@@ -1,0 +1,11 @@
+# options specified here will apply to all posts in this folder
+
+# freeze computational output
+# (see https://quarto.org/docs/projects/code-execution.html#freeze)
+freeze: true
+
+# No banner: the cosmo title banner would add a second accent on top of the derived theme (see design.md).
+title-block-banner: false
+
+# (optional) applied to every post; drop when the user chose per-post authors
+author: "{{author}}"

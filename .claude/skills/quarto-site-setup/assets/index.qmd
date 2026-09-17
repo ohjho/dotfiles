@@ -1,0 +1,26 @@
+---
+title: "{{site_title}}"
+description: "{{one_line_description}}"
+toc: false
+---
+
+{{lede: two to four sentences from the brief — what this is, concretely, and who it is for.
+Name the scope and what it deliberately excludes. Link the source repo or the thing it studies.}}
+
+:::{.callout-tip}
+## Start here
+
+{{one sentence pointing at the single best entry point: the first post, a generated page, or a
+how-to. Link it.}}
+:::
+
+## What is here
+
+- **[Posts](posts.qmd).** {{what the posts are: hand-written studies, experiment write-ups, notes —
+  and the first one by name, linked, when it exists.}}
+- **[About](about.qmd).** Who is behind this.  <!-- drop this line when the About page is not kept -->
+
+## {{How it works / Status / Method — one section the brief supports}}
+
+{{two or three paragraphs: how the thing is built or where it stands, plus the caveats a reader
+should carry. Keep numbers in tables, not prose.}}
