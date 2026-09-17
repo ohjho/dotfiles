@@ -1,21 +1,19 @@
 ---
 name: design-derivation
 description: >-
-  Derive the right visual aesthetic for a page, slide, deck, artifact, or
-  document by reasoning from content, audience, goal, and constraints — instead
-  of picking a look at random — and record the result as design tokens
-  (`design.md` and/or a W3C DTCG `design.tokens.json`) that downstream skills
-  consume. Use this BEFORE styling anything. Fires whenever the user wants to
-  style, design, or choose the look of something: "style this page", "design a
-  slide about X", "what should this look like", "make it look good", "pick
-  colors/fonts/a layout", "give it a visual identity", "design a
-  deck/poster/report", "design tokens", "colour palette for this", "theme my
-  Streamlit app" / `.streamlit/config.toml`, "use my brand colour", "I like
-  this colour", or when surge-artifacts, artifact-design, quarto-writeup,
-  dataviz, or a Streamlit app need a palette and type pairing that does not
-  exist yet. Walks a four-step derivation, proposes a colour scheme and checks
-  it against the user's brand or favourite colour, writes the token files, then
-  hands off to the execution skills.
+  Derive the visual aesthetic for a page, slide, deck, artifact, or document by
+  reasoning from content, audience, goal and constraints instead of picking a
+  look at random, and record it as design tokens (`design.md` and/or a W3C DTCG
+  `design.tokens.json`) that downstream skills consume. Use this BEFORE styling
+  anything. Fires whenever the user wants to style, design or choose the look of
+  something: "style this page", "design a slide about X", "what should this look
+  like", "make it look good", "pick colors/fonts/a layout", "give it a visual
+  identity", "design a deck/poster/report", "design tokens", "colour palette for
+  this", "theme my Streamlit app" / `.streamlit/config.toml`, "use my brand
+  colour", "I like this colour", or when surge-artifacts, artifact-design,
+  quarto-writeup, dataviz or a Streamlit app need a palette and type pairing
+  that does not exist yet. Checks the proposed colours (and full-system scales)
+  with the user before writing, then hands off to the execution skills.
 ---
 
 # Design derivation
@@ -59,9 +57,9 @@ Ask: *where does this run, and what can't I use?* Constraints aren't obstacles �
 
 One decision is load-bearing — usually the one that falls out of step 1. Identify it, make it boldly, and make **everything else serve it**. In the heatmap example, "color = signal temperature" is the keystone; once color carries meaning it can't also be decorative, which forces a restrained, disciplined palette. Spend your boldness in one place; keep the rest quiet. A design with three "wow" moments has none.
 
-## Interaction protocol: two asks
+## Interaction protocol: two asks (three with a full system)
 
-Do **not** interrogate the user question-by-question. There are exactly two interruptions: **round 1** confirms the read and settles the deliverable; **round 2** checks the proposed colour scheme against what the user already has (a brand colour, a favourite colour, an existing palette). No file is written before both are answered.
+Do **not** interrogate the user question-by-question. There are two interruptions for the standard set: **round 1** confirms the read and settles the deliverable; **round 2** checks the proposed colour scheme against what the user already has (a brand colour, a favourite colour, an existing palette). A **third, round 3, fires only when round 1 chose `Full system`**: it checks the spacing and type scales, shadow, motion and breakpoints the same way. No file is written before every round that applies is answered.
 
 ### Round 1 — the read and the deliverable
 
@@ -114,6 +112,31 @@ What happens next:
 
 Record the outcome — what was proposed, what the user supplied, which role it took, what changed — in the `## Colour scheme` section of `design.md`.
 
+### Round 3 — the system check (Full system only)
+
+Skip this round entirely when round 1 chose `Standard set`. When it chose `Full system`, the spacing scale, type scale, shadow, motion durations and breakpoints are design decisions too, and the user gets to see them before they are written — the same courtesy the colours get.
+
+Derive the scales from the rhythm already settled (`space.base`, `radius.md`, `measure.body` stay as they are; this round never re-opens the standard set) and from the constraint: breakpoints come from the host framework (Bootstrap for a Quarto/cosmo site, Tailwind for a Tailwind app, none for a single self-contained page). Show the proposal in text, one line per group, each with its reason:
+
+```
+spacing      4 · 8 · 16 · 32 · 64 px          doubling from the 8px base (goal)
+type         0.8 · 0.9 · 1 · 1.25 · 1.75 rem  captions → h1, about a 1.25 ratio (goal)
+shadow       card: 0 1px 2px rgba(ink, .08)   barely there; surfaces are flat (constraint)
+motion       fast 120ms · base 200ms          hover and theme toggle (goal)
+breakpoints  576 · 768 · 992 · 1200 px        Bootstrap, so site.scss and cosmo agree (constraint)
+```
+
+Then ask **one** `AskUserQuestion` with four questions. Each leads with `Use this proposal (Recommended)` and offers concrete alternatives, not just "adjust"; free text arrives under Other:
+
+1. **Spacing scale** — proposal / `Tighter: ×1.5 steps from the base` / `Looser: ×2 steps from a 12px base` / Other (list the values).
+2. **Type scale** — proposal / `Minor third (1.2): calmer, more steps` / `Perfect fourth (1.333): bigger jumps, fewer steps` / Other.
+3. **Motion and shadow** — proposal / `No motion: durations 0ms, honour prefers-reduced-motion` / `No shadow: surfaces flat, hairlines only` / Other.
+4. **Breakpoints** — proposal / `Tailwind (640 · 768 · 1024 · 1280)` / `None: single column everywhere` / Other.
+
+Shapes the renderer expects: scales and breakpoints are `dimension` objects (`{"value": 16, "unit": "px"}` / `"rem"`); durations are `{"value": 120, "unit": "ms"}` with `$type: "duration"`; a shadow is a **string** (`"0 1px 2px rgba(30, 41, 51, 0.08)"`) with `$type: "shadow"` — the DTCG object form would render as a Python dict. `check` validates only dimension shapes, so read the duration and shadow values back yourself.
+
+Record the outcome — the proposal, what the user changed and why — in the `## System` section of `design.md`.
+
 ## From brief → concrete direction
 
 Collapse the four answers into named choices. Each choice is tied back to the input that produced it, and that provenance travels into the token files as the `from` column / `$extensions` field:
@@ -158,7 +181,7 @@ The **core roles** are a contract — every consumer skill may assume they exist
 
 **Keystone extras** are the tokens that carry the design's one idea — `hot/warm/cold`, `offline/runtime/db`, `good/warn/bad`. Add as many as the keystone needs, in both themes, and no more; a `-soft` sibling for tinted backgrounds is a common pair. Dimensions use the object form `{"value": 8, "unit": "px"}`; font families are arrays ending in a generic family. A font token may carry `"$extensions": {"design-derivation": {"faces": [{"url": "<woff2>", "weight": 400, "style": "normal"}]}}` — the font files Streamlit's `[[theme.fontFaces]]` needs; other renderers ignore it.
 
-**Full system** adds, when chosen: `space.xs … space.xl`, `type.xs … type.xl` (font sizes), `shadow.*`, `motion.duration.*`, `breakpoint.*`. Keep the same naming discipline; the renderer joins paths with dashes (`--space-xl`, `--motion-duration-fast`).
+**Full system** adds, when chosen: `space.xs … space.xl`, `type.xs … type.xl` (font sizes), `shadow.*`, `motion.duration.*`, `breakpoint.*`. Their values are proposed and confirmed in round 3, never chosen silently. Keep the same naming discipline; the renderer joins paths with dashes (`--space-xl`, `--motion-duration-fast`) and emits every one of them as a custom property, but maps none of them onto Bootstrap variables — `site.scss` or the page's CSS has to use them.
 
 `check` enforces light/dark parity, valid hex, and **WCAG AA** contrast: `ink` on `bg` and `surface` ≥ 4.5, `muted` and `accent` on their grounds ≥ 3.0. Extras get warnings only. Fix errors before handing off; a warning on a deliberately decorative extra is fine, say so in `design.md`.
 
@@ -171,6 +194,7 @@ The human brief, structured so a reader can audit every choice:
 ## Derivation        (table: Input | Read | Produces — the four steps)
 ## Keystone          (one bold sentence, then what it forbids)
 ## Colour scheme     (the round-2 proposal, what the user supplied and its role, what changed)
+## System            (full system only: the round-3 proposal and what changed)
 ## Tokens            (one line on scope + check result, then the markers below)
 <!-- tokens:start -->
 <!-- tokens:end -->
@@ -203,7 +227,9 @@ Sanity-test the derivation: **re-derive for a different audience or goal.** Same
 
 ## Calibrate — don't over-invest
 
-Match effort to the request. A utilitarian memo, plan, or internal note needs one honest pass (readable, structured, unfussy), not a full visual identity: still write the standard token set (it is cheap and it stops the page inheriting defaults), but the derivation table can be four short lines and the signature move can be "none, on purpose." Reserve the full derivation and the full system for pieces where the look does real work — something published, persuasive, or meant to teach.
+Match effort to the request. A utilitarian memo, plan, or internal note needs one honest pass (readable, structured, unfussy), not a full visual identity: still write the standard token set (it is cheap and it stops the page inheriting defaults), but the derivation table can be four short lines and the signature move can be "none, on purpose." Reserve the full derivation and the full system for pieces where the look does real work — something published, persuasive, or meant to teach. A utilitarian piece never needs the full system, so round 3 never fires there.
+
+Unsure whether a request is in scope, or which consumer skill runs next? `references/when-to-use.md` holds the untrimmed trigger list and consumer map.
 
 ## Worked example
 

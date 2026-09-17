@@ -31,7 +31,7 @@ they supplied one, its role would have been asked (accent / background / extra /
 ## Tokens
 
 Standard set (core roles + keystone extras). The three font tokens carry `faces` entries
-(Google Fonts woff2 URLs) so the Streamlit render can load IBM Plex. Both themes checked with `design_tokens.py check`: 0 errors.
+(Google Fonts woff2 URLs) so the Streamlit render can load IBM Plex. Both themes checked with `design_tokens.py check`: 0 errors. Standard set, so there is no `## System` section; a full-system run adds one after `## Colour scheme` with the round-3 outcome.
 
 <!-- tokens:start -->
 | token | light | dark | from | note |
